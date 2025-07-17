@@ -1,20 +1,10 @@
-import numpy as np;
+from Core.fetchInfo import i_PAR_NAME, i_PAR_AA, i_PAR_TYPE, i_PAR_RES, i_PAR_SS,\
+    i_CONTACT_NAME, i_CONTACT_AA, i_CONTACT_TYPE, i_CONTACT_RES, i_CONTACT_SS,\
+    i_CONTACT_AREA, i_SECTOR_NUM, i_RES_DIFF;
 
 # Index constants for keys.
 i_KEY_NAME = 0;
 i_KEY_RES = 1;
-# Defining constants for contactSet constants.
-i_PAR_NAME = 0;
-i_PAR_AA = 1;
-i_PAR_TYPE = 2;
-i_PAR_RES = 3;
-i_CONTACT_NAME = 4;
-i_CONTACT_AA = 5;
-i_CONTACT_TYPE = 6;
-i_CONTACT_RES = 7;
-i_CONTACT_AREA = 8;
-i_SECTOR_NUM = 9;
-i_RES_DIFF = 10;
 
 # Purpose: Populating the contents of a given file's
 # contact sets into an edge set and returning it.
@@ -34,11 +24,13 @@ def getEdgeSet(contactSets):
         # Iterating through the contacts, making the edges.
         for contact in parContacts:
             parSector = contact[i_SECTOR_NUM];
+            parSS = contact[i_PAR_SS];
             # Collecting information about the contact.
             contactName = contact[i_CONTACT_NAME];
             contactRes = contact[i_CONTACT_RES];
+            contactSS = contact[i_CONTACT_SS];
             if contactName == "O0": # If a solvent molecule, assume the corresponding edge exists.
-                edge = (parName, parRes, parSector, contactName, contactRes, -1); # Solvent sector is always -1.
+                edge = (parName, parRes, parSector, parSS, contactName, contactRes, -1, contactSS); # Solvent sector is always -1.
                 edgeSet.add(edge); # Cannot have reverse edges.
             else:
                 contactKey = (contactName, contactRes);
@@ -51,8 +43,8 @@ def getEdgeSet(contactSets):
                     contactSector = corrContact[0][i_SECTOR_NUM];
                     # Now that we have the corresponding sector,
                     # we can make the edge.
-                    edge = (parName, parRes, parSector, contactName, contactRes, contactSector);
-                    reverseEdge = (contactName, contactRes, contactSector, parName, parRes, parSector);
+                    edge = (parName, parRes, parSector, parSS, contactName, contactRes, contactSector, contactSS);
+                    reverseEdge = (contactName, contactRes, contactSector, contactSS, parName, parRes, parSector, parSS);
                     # Making sure not to add redundant information.
                     if reverseEdge not in edgeSet:
                         edgeSet.add(edge);

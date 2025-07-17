@@ -1,27 +1,18 @@
 import pandas as pd;
-import math;
 import random as rand;
+from Core.fetchInfo import i_PAR_NAME, i_PAR_AA, i_PAR_TYPE, i_PAR_RES, i_PAR_SS,\
+        i_CONTACT_NAME, i_CONTACT_AA, i_CONTACT_TYPE, i_CONTACT_RES, i_CONTACT_SS,\
+        i_CONTACT_AREA, i_SECTOR_NUM, i_RES_DIFF;
 
-# Defining constants for navigating contact sets.
-i_PAR_NAME = 0;
-i_PAR_AA = 1;
-i_PAR_TYPE = 2;
-i_PAR_RES = 3;
-i_CONTACT_NAME = 4;
-i_CONTACT_AA = 5;
-i_CONTACT_TYPE = 6;
-i_CONTACT_RES = 7;
-i_CONTACT_AREA = 8;
-i_SECTOR_NUM = 9;
-i_RES_DIFF = 10;
-i_CONTACT_DISTANCE = 11;
 # Defining constants for navigating edges.
 i_EDGE_NAME_A = 0;
 i_EDGE_RES_A = 1;
 i_EDGE_SECTOR_A = 2;
-i_EDGE_NAME_B = 3;
-i_EDGE_RES_B = 4;
-i_EDGE_SECTOR_B = 5;
+i_EDGE_SS_A = 3;
+i_EDGE_NAME_B = 4;
+i_EDGE_RES_B = 5;
+i_EDGE_SECTOR_B = 6;
+i_EDGE_SS_B = 7;
 # Defining particle names.
 POSSIBLE_SECTORS = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
 # Tracking df rows.
@@ -63,15 +54,18 @@ def analyzeEdge(edge, particleContacts, parIDMap, structID, permanentStatus):
     A_type = edge[i_EDGE_NAME_A]; # Type - A0, G1, L0, etc.
     A_res = edge[i_EDGE_RES_A];
     A_sector = edge[i_EDGE_SECTOR_A];
+    A_ss = edge[i_EDGE_SS_A];
     A_par = (A_type, A_res);
     # Particle B information.
     B_type = edge[i_EDGE_NAME_B];
     B_res = edge[i_EDGE_RES_B];
     B_sector = edge[i_EDGE_SECTOR_B];
+    B_ss = edge[i_EDGE_SS_B];
     B_par = (B_type, B_res);
     # Building and adding row. Edge_Status will always be 1 as we are
     # only adding real edges here.
-    rows.append(buildRow(A_par, B_par, A_sector, B_sector, parIDMap, structID, permanentStatus, edgeStatus = 1));
+    rows.append(buildRow(A_par, B_par, A_sector, B_sector, A_ss, B_ss,
+                         parIDMap, structID, permanentStatus, edgeStatus = 1));
     # Now building and adding a fake row.
     # Finding empty sectors which could be used for the
     # hard negative.
@@ -91,7 +85,8 @@ def analyzeEdge(edge, particleContacts, parIDMap, structID, permanentStatus):
     if len(A_emptySectors) > 0 and len(B_emptySectors) > 0:
         A_newSector = rand.choice(list(A_emptySectors));
         B_newSector = rand.choice(list(B_emptySectors));
-        rows.append(buildRow(A_par, B_par, A_newSector, B_newSector, parIDMap, structID, permanentStatus, edgeStatus = 0));
+        rows.append(buildRow(A_par, B_par, A_newSector, B_newSector, A_ss, B_ss,
+                             parIDMap, structID, permanentStatus, edgeStatus = 0));
     # Only making an easy negative for non-permanent entries.
     if not permanentStatus:
         while True: # Looping until we are able to make the easy negative
@@ -116,7 +111,8 @@ def analyzeEdge(edge, particleContacts, parIDMap, structID, permanentStatus):
             rand_A_sector = rand.choice(list(rand_A_emptySectors));
             rand_B_sector = rand.choice(list(rand_B_emptySectors));
             # Information pertaining to both particles.
-            rows.append(buildRow(rand_A_par, rand_B_par, rand_A_sector, rand_B_sector, parIDMap, structID, permanentStatus, edgeStatus = 0));
+            rows.append(buildRow(rand_A_par, rand_B_par, rand_A_sector, rand_B_sector, A_ss, B_ss,
+                                 parIDMap, structID, permanentStatus, edgeStatus = 0));
             break; # Loop will end.
 
 # Purpose: To build a df row dataframe.
@@ -125,13 +121,15 @@ def analyzeEdge(edge, particleContacts, parIDMap, structID, permanentStatus):
 #   B_par = B_particle.
 #   A_sector = The sector for particle A.
 #   B_sector = The sector for particle B.
+#   A_ss = The secondary structure value for particle A.
+#   B_ss = The secondary structure value for particle B.
 #   parIDMap = A dictionary mapping all particles to their IDs.
 #   structID = The structure ID.
 #   permanentStatus = The permanent status of the edge.
 #   edgeStatus = 1 or 0 indicating if the edge exists.
 # Return:
 #   A df representing a row of the df.
-def buildRow(A_par, B_par, A_sector, B_sector, parIDMap, structID, permanentStatus, edgeStatus):
+def buildRow(A_par, B_par, A_sector, B_sector, A_ss, B_ss, parIDMap, structID, permanentStatus, edgeStatus):
     # Par A information.
     A_type = A_par[0];  # Type - A0, G1, L0, etc.
     A_res = A_par[1];
@@ -144,11 +142,14 @@ def buildRow(A_par, B_par, A_sector, B_sector, parIDMap, structID, permanentStat
     try:
         seqDiff = A_res - B_res;
         seqSep = abs(seqDiff);
+        solventStatus = 0;
     except:
-        seqDiff = "-";
-        seqSep = "-";
+        seqDiff = 0.5;
+        seqSep = 0.5;
+        solventStatus = 1;
     # Building and returning row.
-    return (structID, A_ID, A_type, A_sector, B_ID, B_type, B_sector, seqSep, seqDiff, permanentStatus, edgeStatus);
+    return (structID, A_ID, A_type, A_sector, A_ss, B_ID, B_type, B_sector, B_ss,
+            seqSep, seqDiff, solventStatus, permanentStatus, edgeStatus);
 
 # Purpose: To export the dataframe.
 # Parameters:
@@ -156,8 +157,8 @@ def buildRow(A_par, B_par, A_sector, B_sector, parIDMap, structID, permanentStat
 #   outputSuff = The suffix for the output file.
 def export(outputDir, outputSuff):
     df = pd.DataFrame(rows, columns = ["Struct_ID",
-                                       "ID_A", "Type_A", "Sector_A",
-                                       "ID_B", "Type_B", "Sector_B",
+                                       "ID_A", "Type_A", "Sector_A", "SS_A",
+                                       "ID_B", "Type_B", "Sector_B", "SS_B",
                                        "Sequence_Separation", "Sequence_Difference",
-                                       "Permanent_Status", "Edge_Status"]);
+                                       "Solvent_Status", "Permanent_Status", "Edge_Status"]);
     df.to_csv(f"{outputDir}/edges_{outputSuff}.tsv", sep = "\t", index = False);
